@@ -1,0 +1,3 @@
+./receiver crc10
+
+./sender myfile.txt single checksum16
