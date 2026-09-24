@@ -1,0 +1,3 @@
+[GBN-receiver] waiting for setup...
+[GBN-receiver] expecting 66 frames, scheme=CRC32
+[GBN-receiver] done. accepted=66 corrupted_discarded=57 out_of_order_discarded=112 acks_dropped=24 acks_corrupted=28

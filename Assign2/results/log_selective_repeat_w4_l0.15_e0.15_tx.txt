@@ -1,0 +1,2 @@
+[SR-sender] progress base=66/66 tx=124
+[SR-sender] N=4 frames=66 tx_attempts=124 retransmissions=58 dropped=19 corrupted=16 elapsed_ms=2406.41 avg_rtt_ms=28.20 throughput_Bps=1246.7 efficiency=53.23%

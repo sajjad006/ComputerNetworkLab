@@ -1,0 +1,31 @@
+Build:
+  make
+
+Args -- sender:   <input_file> [window_N] <loss_prob> <error_prob> [fcs_scheme=crc32]
+        receiver: <output_file> [window_N] <ack_loss_prob> <ack_error_prob> [fcs_scheme=crc32]
+        (window_N only applies to go_back_n / selective_repeat)
+
+--- Stop-and-Wait ---
+./sw_receiver rx.txt 0 0
+./sw_sender   testfile.txt 0 0
+
+--- Go-Back-N (window 8) ---
+./gbn_receiver rx.txt 0 0
+./gbn_sender   testfile.txt 8 0 0
+
+--- Selective Repeat (window 8) ---
+./sr_receiver rx.txt 8 0 0
+./sr_sender   testfile.txt 8 0 0
+
+--- Same, but with a lossy/erroring channel (20% loss, 10% bit-error) ---
+./sw_receiver  rx.txt 0.2 0.1
+./sw_sender    testfile.txt 0.2 0.1
+
+./gbn_receiver rx.txt 0.2 0.1
+./gbn_sender   testfile.txt 8 0.2 0.1
+
+./sr_receiver  rx.txt 8 0.2 0.1
+./sr_sender    testfile.txt 8 0.2 0.1
+
+Verify correctness after any run:
+  diff testfile.txt rx.txt && echo IDENTICAL

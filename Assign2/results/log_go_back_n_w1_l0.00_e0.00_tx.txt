@@ -1,0 +1,5 @@
+[GBN-sender] progress base=200/730 tx=200 timeouts=0
+[GBN-sender] progress base=400/730 tx=400 timeouts=0
+[GBN-sender] progress base=600/730 tx=600 timeouts=0
+[GBN-sender] progress base=730/730 tx=730 timeouts=0
+[GBN-sender] N=1 frames=730 tx_attempts=730 retransmissions=0 dropped=0 corrupted=0 elapsed_ms=12113.25 avg_rtt_ms=8.52 throughput_Bps=2771.0 efficiency=100.00%

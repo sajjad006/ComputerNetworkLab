@@ -4,10 +4,9 @@
 #include <string>
 using namespace std;
 
-enum ErrorType { SINGLE_BIT, TWO_ISOLATED, ODD_ERRORS, BURST, WORD_SWAP, CRC_MULTIPLE };
+enum ErrorType { SINGLE_BIT, TWO_ISOLATED, ODD_ERRORS, BURST };
 
+// Flips bit(s) in `frame` according to `type`. Returns the corrupted copy.
 string injectError(string frame, ErrorType type);
-
-string injectCrcMultiple(string frame, vector<int> gen);
 
 #endif

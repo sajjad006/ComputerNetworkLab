@@ -1,0 +1,1 @@
+[SW-sender] frames=66 tx_attempts=207 retransmissions=141 dropped=50 corrupted=40 elapsed_ms=8094.96 avg_rtt_ms=16.61 throughput_Bps=370.6 efficiency=31.88%

@@ -1,0 +1,3 @@
+[SR-receiver] waiting for setup...
+[SR-receiver] expecting 66 frames, N=4, scheme=CRC32
+[SR-receiver] done. delivered=66 new=66 duplicates=0 corrupted_discarded=0 ignored=0 acks_dropped=0 acks_corrupted=0

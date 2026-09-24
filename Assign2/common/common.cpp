@@ -22,7 +22,6 @@ const char* schemeName(FCS fcs_type) {
     }
 }
 
-
 string hexToBytes(const string& hex) {
     string bytes;
     for (size_t i = 0; i < hex.length(); i += 2) {
@@ -49,7 +48,6 @@ void printHex(const string& data) {
 // ================= Checksum-16 =================
 string calculateCheckSum16(string dataword) {
     unsigned int sum = 0;
-    // pad to even length so the last 16-bit word is well defined
     if (dataword.length() % 2 != 0) dataword.push_back('\0');
 
     for (size_t i = 0; i < dataword.length(); i += 2) {
@@ -57,7 +55,7 @@ string calculateCheckSum16(string dataword) {
             (static_cast<unsigned char>(dataword[i]) << 8) |
              static_cast<unsigned char>(dataword[i + 1]);
         sum += word;
-        if (sum > 0xFFFF) sum = (sum & 0xFFFF) + (sum >> 16);   // end-around carry
+        if (sum > 0xFFFF) sum = (sum & 0xFFFF) + (sum >> 16);
     }
     unsigned short checksum = static_cast<unsigned short>(~sum);
     string result;
@@ -101,30 +99,21 @@ string calculateCRC(string dataword, vector<int> gen) {
 }
 
 string calculateCRC8(string dataword) {
-    vector<int> gen = {1,1,1,0,1,0,1,0,1};   // model — leave as is
+    vector<int> gen = {1,1,1,0,1,0,1,0,1};
     return calculateCRC(dataword, gen);
 }
 
 string calculateCRC10(string dataword) {
-    // CRC-10 polynomial: x^10 + x^9 + x^5 + x^4 + x + 1
     vector<int> gen = {1,0,0,0,1,1,0,0,1,1,1};
     return calculateCRC(dataword, gen);
 }
 
-
 string calculateCRC16(string dataword) {
-    // CRC-16 polynomial: x^16 + x^15 + x^2 + 1
     vector<int> gen = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1};
     return calculateCRC(dataword, gen);
 }
 
-
 string calculateCRC32(string dataword) {
-
-    // CRC-32 / IEEE 802.3 polynomial:
-    // x^32 + x^26 + x^23 + x^22 + x^16 + x^12 +
-    // x^11 + x^10 + x^8 + x^7 + x^5 + x^4 + x^2 + x + 1
-
     vector<int> gen = {
         1,0,0,0,0,1,1,0,
         0,1,1,0,0,0,0,0,
@@ -133,29 +122,10 @@ string calculateCRC32(string dataword) {
         1,0,1,1,1,0,1,1,
         1
     };
-
     return calculateCRC(dataword, gen);
 }
 
-// ================= Frame =================
-Frame::Frame(string srcMAC, string dstMAC, string payload, FCS fcs_type,
-             unsigned short int seqno, unsigned short int payload_size) {
-    this->srcMAC = hexToBytes(srcMAC);
-    this->dstMAC = hexToBytes(dstMAC);
-    this->seqno  = seqno;
-    this->payload_length = payload.length();
-
-    if (payload.length() < payload_size) {
-        int diff = payload_size - payload.length();
-        while (diff-- > 0) payload += '\0';
-    }
-    this->payload = payload;
-    this->fcs = calculateFCS(this->srcMAC + this->dstMAC +
-                             uint16ToBytes(payload_length) +
-                             uint16ToBytes(seqno) + payload, fcs_type);
-}
-
-string Frame::calculateFCS(string dataword, FCS fcs_type) {
+string calculateFCS(const string& dataword, FCS fcs_type) {
     switch (fcs_type) {
         case CHECKSUM16: return calculateCheckSum16(dataword);
         case CRC8:       return calculateCRC8(dataword);
@@ -166,28 +136,6 @@ string Frame::calculateFCS(string dataword, FCS fcs_type) {
     return "";
 }
 
-string Frame::toBinary() const {
-    return srcMAC + dstMAC + uint16ToBytes(payload_length) +
-           uint16ToBytes(seqno) + payload + fcs;
-}
-
-Frame Frame::fromBytes(const string& raw, FCS fcs_type, int payload_size) {
-    Frame f;
-    size_t p = 0;
-    f.srcMAC = raw.substr(p, 6); p += 6;
-    f.dstMAC = raw.substr(p, 6); p += 6;
-    f.payload_length = (static_cast<unsigned char>(raw[p]) << 8) |
-                        static_cast<unsigned char>(raw[p + 1]); p += 2;
-    f.seqno = (static_cast<unsigned char>(raw[p]) << 8) |
-               static_cast<unsigned char>(raw[p + 1]); p += 2;
-    f.payload = raw.substr(p, payload_size); p += payload_size;
-    f.fcs = raw.substr(p);   // remaining bytes are the FCS
-    return f;
-}
-
-bool verifyFCS(const Frame& r, FCS fcs_type) {
-    string dataword = r.srcMAC + r.dstMAC +
-                      uint16ToBytes(r.payload_length) +
-                      uint16ToBytes(r.seqno) + r.payload;
-    return Frame::calculateFCS(dataword, fcs_type) == r.fcs;
+bool verifyFCSBytes(const string& dataword, const string& fcs, FCS fcs_type) {
+    return calculateFCS(dataword, fcs_type) == fcs;
 }

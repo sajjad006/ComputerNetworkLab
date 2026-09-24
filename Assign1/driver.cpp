@@ -21,13 +21,27 @@ static void banner(const char* title) {
     dline();
 }
 
+// driver.cpp — add near the top (mirror YOUR filled-in generators):
+static vector<int> genFor(FCS s) {
+    switch (s) {
+        case CRC8:  return {1,1,1,0,1,0,1,0,1};              // your CRC-8 (model)
+        case CRC10: return { /* your 11 bits */ };
+        case CRC16: return { /* your 17 bits */ };
+        case CRC32: return { /* your 33 bits */ };
+        default:    return {};                               // checksum: no generator
+    }
+}
+
 int main() {
     srand(time(nullptr));
 
     FCS    schemes[]    = { CHECKSUM16, CRC8, CRC10, CRC16, CRC32 };
     const char* sName[] = { "CHECKSUM16","CRC8","CRC10","CRC16","CRC32" };
-    ErrorType errs[]    = { SINGLE_BIT, TWO_ISOLATED, ODD_ERRORS, BURST };
-    const char* eName[] = { "single-bit","two-isolated","odd-errors","burst" };
+    // ErrorType errs[]    = { SINGLE_BIT, TWO_ISOLATED, ODD_ERRORS, BURST };
+    // const char* eName[] = { "single-bit","two-isolated","odd-errors","burst" };
+
+    ErrorType errs[] = { SINGLE_BIT, TWO_ISOLATED, ODD_ERRORS, BURST, WORD_SWAP, CRC_MULTIPLE };
+    const char* errName[] = { "single","two_isolated","odd","burst","word_swap","crc_multiple" };
 
     string sample = "The quick brown fox jumps over the lazy dog 12345";
 
@@ -54,7 +68,17 @@ int main() {
                 Frame f("F8CA12E9B0AA", "CA29C8F10AB6", sample,
                         schemes[s], t & 0xFFFF, PAYLOAD_SIZE);
                 string clean     = f.toBinary();
-                string corrupted = injectError(clean, errs[e]);
+                // string corrupted = injectError(clean, errs[e]);
+                string corrupted;
+                if (errs[e] == CRC_MULTIPLE) {
+                    vector<int> g = genFor(schemes[s]);
+                    if (g.empty())               // checksum has no generator:
+                        corrupted = injectError(clean, BURST);  // fall back so the row still runs
+                    else
+                        corrupted = injectCrcMultiple(clean, g);
+                } else {
+                    corrupted = injectError(clean, errs[e]);
+                }
 
                 Frame r = Frame::fromBytes(corrupted, schemes[s], PAYLOAD_SIZE);
                 bool changed = (corrupted != clean);

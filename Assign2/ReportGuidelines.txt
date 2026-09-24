@@ -1,0 +1,30 @@
+CSE/PC/B/S/314 Computer Networks Lab
+
+Guidelines for Preparing Computer Networks Lab Report
+
+Title:
+- Basic information like name, class, group, assignment number, problem
+statement and date (deadline and submission)).
+Design:
+- Give a short paragraph describing the purpose of the program.
+- Draw a structure diagram to reflect the procedural organization of the
+program as you have designed it in the previous step.
+- Describe input and output format.
+Implementation:
+- Code snippet, method description, interfaces etc.
+Test cases:
+- Describe the tests you will perform to verify the correctness of your program.
+This should be a thorough and exhaustive list of test cases designed to show
+that your program does everything it is supposed to do. For each test case,
+give sample test data and state what you are checking.
+Results:
+- Performance metrics used for evaluation, Figures or graphs, tables.
+Analysis:
+- Discussion on results considering different test cases, error, correctness,
+known bugs, possible improvements.
+Comments:
+- Evaluate the lab assignment. What did you learn from it? Was it too hard?
+(explain why?) Too easy? (explain why?) Suggest improvements if you can.
+
+Please note that your design and implementation of assignments can help you to make your
+submission different from your classmates.

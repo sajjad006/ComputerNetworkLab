@@ -1,0 +1,2 @@
+[GBN-sender] progress base=66/66 tx=98 timeouts=8
+[GBN-sender] N=4 frames=66 tx_attempts=98 retransmissions=32 dropped=4 corrupted=5 elapsed_ms=1413.03 avg_rtt_ms=25.51 throughput_Bps=2123.1 efficiency=67.35%

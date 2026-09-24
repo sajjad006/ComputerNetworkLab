@@ -1,0 +1,5 @@
+[SR-sender] progress base=199/730 tx=200
+[SR-sender] progress base=399/730 tx=400
+[SR-sender] progress base=599/730 tx=600
+[SR-sender] progress base=730/730 tx=730
+[SR-sender] N=2 frames=730 tx_attempts=730 retransmissions=0 dropped=0 corrupted=0 elapsed_ms=7788.87 avg_rtt_ms=21.32 throughput_Bps=4309.5 efficiency=100.00%

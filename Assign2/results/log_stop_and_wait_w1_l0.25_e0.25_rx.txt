@@ -1,0 +1,3 @@
+[SW-receiver] waiting for setup...
+[SW-receiver] expecting 66 frames, scheme=CRC32
+[SW-receiver] done. accepted=66 corrupted_discarded=40 duplicates=51 unexpected=0 acks_dropped=25 acks_corrupted=26

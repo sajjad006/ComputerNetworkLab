@@ -1,0 +1,22 @@
+CSE/PC/B/S/314 Computer Networks Lab
+CO3: Design and implement medium access control mechanisms within a simulated network
+environment using IEEE 802 standards.
+Assignment 3: Implement CSMA techniques with collision detection.
+Code demonstration due on: 21-25 September 2026 (in your respective lab classes)
+Report submission due on: next lab classes
+Softcopy of the report to be uploaded in the drive.
+Language: You can write the program in any high level language like C, C++, Java, Python etc.
+Please note that you may need to use these schemes separately for other applications (assignments).
+Use the same sender-receiver design as previous assignments.
+In this assignment, you have to emulate the shared channel (maintaining its state as IDLE, BUSY, or
+COLLISION), while multiple independent client processes emulate network stations that sense the
+channel and attempt transmission according to a given CSMA strategy (Non-Persistent, 1-Persistent,
+p-Persistent, CSMA/CD). Write methods/functions to emulate carrier sensing, collision detection, and
+backoff behavior. Analyze how the number of contending stations affects the number of collisions,
+average transmission delay, and overall channel throughput.
+Test the above schemes for the following cases (not limited to).
+i) For p-persistent CSMA, plot number of collisions, transmission delay, and throughput as functions of p
+(fixed N).
+ii) For all schemes (Non-Persistent, 1-Persistent, p-Persistent at best p, CSMA/CD), plot the same three
+metrics as functions of the number of contending stations N, and compare their efficiency.
+State your observations on the impact of performance of CSMA techniques in different scenarios.
