@@ -1,0 +1,30 @@
+# Build
+make
+
+# --- Live demo (slow, human-watchable trace) ---
+# Terminal 1: start the channel server first.
+#   args: <port> <N> <scheme> <p> <frameSlots> <jamSlots> <maxSlots> [demoDelayMs]
+#   demoDelayMs > 0 prints a live per-slot trace and paces the loop for demo purposes.
+./channel_server 9500 4 one_persistent 0.0 5 1 60 150
+
+# Terminals 2-5 (or a loop in one terminal): one station process each.
+#   args: <host> <port> <scheme> <p> <backoffCap>
+./station 127.0.0.1 9500 one_persistent 0.0 10
+./station 127.0.0.1 9500 one_persistent 0.0 10
+./station 127.0.0.1 9500 one_persistent 0.0 10
+./station 127.0.0.1 9500 one_persistent 0.0 10
+
+# --- Same demo, other schemes (compare collision behavior side by side) ---
+./channel_server 9501 4 non_persistent 0.0 5 1 60 150
+./channel_server 9502 4 p_persistent   0.3 5 1 60 150
+./channel_server 9503 4 csma_cd        0.0 5 1 60 150
+# (launch 4 matching ./station ... calls against each port, same scheme/p as the server)
+
+# --- Fast, silent run (no demoDelayMs arg -> full speed, just the final RESULT line) ---
+./channel_server 9510 10 csma_cd 0.0 5 1 20000
+# then 10x: ./station 127.0.0.1 9510 csma_cd 0.0 10
+
+# --- Full experiment suite used for the report (both required test cases) ---
+python3 run_experiments.py
+# writes results/expA_p_sweep.csv (p-sweep, N fixed) and
+#        results/expB_n_sweep.csv (N-sweep, all 4 schemes)
