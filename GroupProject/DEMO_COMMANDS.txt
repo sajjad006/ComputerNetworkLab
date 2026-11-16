@@ -1,0 +1,151 @@
+=====================================================================
+  GROUP PROJECT DEMO: ARP + DHCP          (Linux, run from GroupProject/)
+=====================================================================
+
+Each step: command  -->  what to point out.
+"T1, T2 ..." = separate terminal windows.
+
+
+---------------------------------------------------------------------
+ PART 1: ARP   (simulated LAN: lan_hub = switch, each host = a PC)
+---------------------------------------------------------------------
+
+Build (once):
+    cd arp
+    make linux
+
+T1  ./lan_hub
+        --> the "switch". Prints every ARP packet it forwards.
+
+T2  ./host 192.168.1.1 02:00:00:00:00:01
+        --> host A comes up and registers with the hub.
+
+T3  ./host 192.168.1.2 02:00:00:00:00:02 192.168.1.1
+        --> host B immediately resolves 192.168.1.1:
+            B: "Cache miss", sends REQUEST (broadcast)
+            T1 (hub): REQUEST ... [BROADCAST], then REPLY ... [UNICAST]
+            T2 (A): "who-has ME", caches B, sends REPLY
+            B: "Resolved (after reply)" and prints its cache
+
+    In T3 (host B) type:
+    resolve 192.168.1.1
+        --> "Resolved (cache hit)". Nothing is sent; the hub prints nothing.
+    resolve 192.168.1.9
+        --> no such host: broadcast goes out, "ARP timeout - no reply" after 3 s.
+    cache
+        --> shows the table with remaining time (60 s TTL).
+
+    In T2 (host A) type:
+    grat
+        --> gratuitous ARP: A announces its own IP to everyone.
+            T1: "... (gratuitous)"
+            T3: "Gratuitous ARP: 192.168.1.1 is-at ..." and its cache entry is refreshed.
+
+IP conflict / ARP spoofing:
+T4  ./host 192.168.1.1 02:00:00:00:00:99
+    In T4 type:
+    grat
+        --> T2 (the real 192.168.1.1): "[WARNING] IP conflict"
+            T3: cache now says 192.168.1.1 -> 02:00:00:00:00:99
+            = ARP has no authentication, so this is how ARP spoofing works.
+    quit
+
+Cache expiry:
+    wait 60 s, then in T3 type:
+    cache                       --> the entry is gone
+    resolve 192.168.1.1         --> "Cache miss" again, a new request is sent
+
+Stop: type quit in each host, Ctrl+C in the hub.
+
+
+---------------------------------------------------------------------
+ PART 2: DHCP   (virtual LAN: router + pc1, pc2, pc3 as network namespaces)
+---------------------------------------------------------------------
+
+    cd ../dhcp          (all commands below need sudo)
+
+T1  sudo ./demo.sh setup
+        --> builds the client/server and the virtual LAN. PCs have a MAC but NO IP.
+T1  sudo ./demo.sh server
+        --> DHCP server on 192.168.50.1, pool .100-.102, waits on UDP port 67.
+            Leave it running: it prints the lease table after every message.
+
+T2  sudo ./demo.sh watch
+        --> live picture of the whole LAN (IP, MAC, gateway, ARP cache of every
+            machine, and the switch's MAC table). Shows "(no IP)" for all PCs.
+            Leave it running.
+
+T3  sudo ./demo.sh client pc1
+        --> full DORA on screen: DISCOVER -> OFFER -> REQUEST -> ACK,
+            then the IP is applied to pc1's eth0.
+            T1: lease table goes OFFERED -> BOUND.
+            T2: pc1 changes from "(no IP)" to 192.168.50.100.
+T3  sudo ./demo.sh client pc2
+        --> different MAC = next address, 192.168.50.101.
+
+DHCP + ARP together:
+T3  sudo ./demo.sh ping pc1
+        --> pc1 pings the router using its DHCP address, then shows its ARP cache.
+            T2: ARP caches of pc1 and the router fill in.
+T3  sudo ./demo.sh ping pc2 192.168.50.100
+        --> PC to PC: pc2 ARPs for pc1's MAC (02:00:00:00:00:01).
+
+Look inside a PC:
+T4  sudo ./demo.sh shell pc1
+    [pc1] # ip a                     --> eth0 has 192.168.50.100/24
+    [pc1] # ip route                 --> default via 192.168.50.1 (from DHCP)
+    [pc1] # ip neigh                 --> pc1's ARP cache
+    [pc1] # ping -c 2 192.168.50.101
+    [pc1] # exit
+
+Same MAC gets the same IP:
+T3  sudo ./demo.sh reset pc1
+T3  sudo ./demo.sh client pc1
+        --> 192.168.50.100 again: the server keys leases on the MAC.
+
+A standard client works with our server:
+T3  sudo ./demo.sh udhcpc pc3
+        --> BusyBox udhcpc (not written by us) gets 192.168.50.102.
+
+
+---------------------------------------------------------------------
+ OPTIONAL EXTRAS
+---------------------------------------------------------------------
+
+See the packets (instead of watch, in T2):
+    sudo ./demo.sh capture
+        --> DISCOVER from 0.0.0.0 to 255.255.255.255, OFFER, REQUEST, ACK,
+            ARP who-has / is-at, and ICMP ping.
+
+Wireshark:
+    sudo ./demo.sh capture-file      (run the clients, then Ctrl+C)
+    wireshark dhcp_demo.pcap
+        --> every field of the DHCP and ARP packets, decoded.
+
+Pool exhausted (start fresh):
+    Ctrl+C the server in T1
+    sudo ./demo.sh cleanup
+    sudo ./demo.sh setup
+    sudo ./demo.sh server 120 2          (only 2 addresses)
+    sudo ./demo.sh client pc1            --> .100
+    sudo ./demo.sh client pc2            --> .101
+    sudo ./demo.sh client pc3            --> "No OFFER received"
+                                             T1: "pool exhausted, no OFFER sent"
+
+Our client against a real router (home Wi-Fi only, prints the lease, changes nothing):
+    sudo ./dhcp_client wlan0             (use your interface name, see: ip a)
+
+One-shot views:
+    sudo ./demo.sh show                  (the watch picture, once)
+    sudo ./demo.sh status                (just the IPs)
+
+
+---------------------------------------------------------------------
+ CLEAN UP
+---------------------------------------------------------------------
+    Ctrl+C the server and watch
+    sudo ./demo.sh cleanup               --> removes the virtual LAN
+    cd ../arp && make clean
+
+NEVER run dhcp_server on college / office Wi-Fi: it would hand out
+addresses to other people's devices. Only use the virtual LAN.

@@ -1,0 +1,39 @@
+# Build
+make
+
+# --- Live demo (slow, human-watchable trace) ---
+# Terminal 1: start the channel server first.
+#   args: <port> <N> <walsh|random> <codeLen> <noiseSigma> <seed> [demoDelayMs]
+#   codeLen 0 = smallest power of two >= N.
+#   demoDelayMs > 0 prints the chip sequences, then per slot: bits sent, the
+#   summed channel signal, and what each receiver decoded ('-' = silent).
+./channel_server 9600 4 walsh 0 0 1 300
+
+# Terminals 2-9 (or one terminal with &): one sender + one receiver per station.
+#   sender args:   <host> <port> <id> <inputFile>
+#   receiver args: <host> <port> <id> <outputFile>
+./receiver 127.0.0.1 9600 0 rx0.txt &  ./sender 127.0.0.1 9600 0 data/msg0.txt &
+./receiver 127.0.0.1 9600 1 rx1.txt &  ./sender 127.0.0.1 9600 1 data/msg1.txt &
+./receiver 127.0.0.1 9600 2 rx2.txt &  ./sender 127.0.0.1 9600 2 data/msg2.txt &
+./receiver 127.0.0.1 9600 3 rx3.txt &  ./sender 127.0.0.1 9600 3 data/msg3.txt &
+
+# Verify perfect reconstruction at every station:
+for i in 0 1 2 3; do cmp data/msg$i.txt rx$i.txt && echo "station $i OK"; done
+
+# --- Same demo over a noisy channel (Gaussian noise, sigma=0.8 per chip) ---
+./channel_server 9601 4 walsh 0 0.8 1 300
+# (launch the same 4 receiver/sender pairs against port 9601; errors are flagged "<-- ERROR")
+
+# --- Same demo with non-orthogonal random +/-1 codes (multiple-access interference) ---
+./channel_server 9602 4 random 4 0 3 300
+# (launch the same 4 receiver/sender pairs against port 9602)
+
+# --- Full experiment suite used for the report ---
+python3 run_experiments.py
+# writes results/expA_correctness.csv      (Walsh, noiseless, N sweep)
+#        results/expB_noise.csv            (BER vs noise sigma, L = N in {4..64})
+#        results/expB2_noise_vs_n.csv      (BER vs N at fixed L=16, sigma=1.5)
+#        results/expC_walsh_vs_random.csv  (Walsh vs random codes, L=16)
+
+# --- Figures for the report ---
+cd report && python3 make_plots.py
