@@ -1,0 +1,709 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{longtable}
+\usepackage{xurl}
+\setlength{\emergencystretch}{3em}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
+
+\definecolor{codebg}{rgb}{0.96,0.96,0.96}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  breaklines=true,
+  columns=fullflexible,
+  tabsize=2,
+}
+
+% A value that was configured but is not visible in any screenshot.
+\newcommand{\fillin}{\textbf{\color{red!60!black}[fill in]}}
+
+\newcommand{\shot}[3][\textwidth]{%
+  \begin{figure}[H]\centering\includegraphics[width=#1]{figures/#2}\caption{#3}\label{fig:#2}\end{figure}}
+
+\title{\Large\textbf{Lab Assignment Report: Building and Testing\\ Networks in Cisco Packet Tracer}}
+\author{Sajjad Ahmed Shaaz \\ 002410501093 \\ BCSE-III A3}
+\date{November 17, 2026}
+
+\begin{document}
+\maketitle
+
+\section*{Basic Information}
+\begin{itemize}[leftmargin=1.6em]
+  \item \textbf{Subject:} CSE/PC/B/S/314 Computer Networks Lab
+  \item \textbf{Assignment Number:} 6
+  \item \textbf{Problem Statement:} Use Cisco Packet Tracer to build progressively larger
+  networks: two hosts back-to-back, a hub LAN, a switch LAN (with ARP and MAC tables), the
+  two LANs joined, two routed LANs with static routes, DHCP servers in those LANs, and finally
+  a departmental LAN with DHCP, DNS, web and FTP servers under the domain
+  \texttt{cse.myuniv.edu}.
+  \item \textbf{Submission due:} 2nd lab after the Puja vacation (tentatively 02--06
+  November 2026)
+\end{itemize}
+
+\section{Design}
+
+\subsection{Purpose}
+Assignment 5 observed a real network from the outside with Wireshark. This assignment
+builds networks from the inside. Every device, cable, address, table and service is placed
+and configured by hand, then tested with \texttt{ping}, \texttt{arp}, \texttt{ipconfig},
+\texttt{show mac address-table}, a browser and an FTP client. The seven questions climb
+the stack: Layer 1 (cables and hubs), Layer 2 (switching and ARP), Layer 3 (routing), and
+finally application services (DHCP, DNS, HTTP, FTP).
+
+\subsection{Environment}
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Item} & \textbf{Value} \\
+\midrule
+Simulator & Cisco Packet Tracer (Linux), Realtime mode \\
+Saved topology & \texttt{assignment6.pkt} (all seven networks in one file) \\
+End hosts & \texttt{PC-PT} (Windows-like command prompt, TTL 128) \\
+Servers & \texttt{Server-PT} (DHCP, DNS, HTTP, FTP services) \\
+Hub / generic switch & \texttt{Hub-PT}, \texttt{Switch-PT} (Q2--Q4) \\
+Managed switch & Cisco \texttt{2950-24} (Q5--Q7) \\
+Router & Cisco \texttt{1841} (Q5--Q6); see note below \\
+\bottomrule
+\end{tabular}
+\caption{Devices used.}
+\end{table}
+
+\paragraph{Note on the router model.} The assignment asks for a ``Cisco 1818''. No such
+model exists in Packet Tracer's router list (the closest are the 1841 and the 1941). The
+\textbf{1841} was used. It has two FastEthernet ports, Fa0/0 for the LAN and Fa0/1 for
+the router-to-router link, which is all that Q5 needs.
+
+\subsection{Addressing Plan}
+Table~\ref{tab:plan} summarises every network built. Per-device addresses are given in each
+question's \emph{Topology and Addressing} subsection.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{llp{4.3cm}l}
+\toprule
+\textbf{Q} & \textbf{Network} & \textbf{Subnet} & \textbf{Address assignment} \\
+\midrule
+1 & PC0 -- PC1 (cross-over) & 192.168.1.0/24 & static, .1--.2 \\
+2 & LAN-A (hub) & 192.168.1.0/24 & static, .3--.5 \\
+3 & LAN-B (switch) & 192.168.1.0/24 & static, .6--.8 \\
+4 & LAN-A + LAN-B & 192.168.1.0/24 & unchanged (one broadcast domain) \\
+5 & JU-Main / JU-SL / WAN & 192.168.148.0/24, .149.0/24, .150.0/24 & static, gateway \texttt{.1} \\
+6 & JU-Main / JU-SL & same as Q5 & DHCP from a server in each LAN \\
+7 & CSE & 192.168.151.0/24 & DHCP for hosts, static for servers \\
+\bottomrule
+\end{tabular}
+\caption{Subnets used in the assignment.}
+\label{tab:plan}
+\end{table}
+
+LAN-A and LAN-B deliberately share the subnet 192.168.1.0/24 (with no overlapping host
+addresses). Q4 joins them at Layer 2 only, with no router. That works only if every host is
+on the same IP subnet.
+
+\subsection{Structure of Each Question}
+Each question is written up in three parts:
+\begin{enumerate}[leftmargin=1.8em]
+  \item \textbf{Topology and Addressing}: a diagram of the network (drawn from the Packet
+  Tracer workspace, with every address on it) and a table of devices.
+  \item \textbf{Procedure}: what was placed, cabled and configured, and how.
+  \item \textbf{Results}: screenshots of the tests, followed by observations.
+\end{enumerate}
+In the diagrams, a \textbf{solid line} is a copper straight-through cable and a
+\textbf{dashed line} is a copper cross-over cable, matching Packet Tracer's own notation.
+
+%==========================================================================
+\section{Questions}
+
+%--------------------------------------------------------------------------
+\subsection{Q1: Two Hosts Back-to-Back with a Cross-over Cable}
+
+\subsubsection*{Topology and Addressing}
+\shot[0.75\textwidth]{topo_q1.png}{Q1 topology: two PCs joined directly by a cross-over cable.}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Device} & \textbf{Interface} & \textbf{IPv4 address} & \textbf{Subnet mask} \\
+\midrule
+PC0 & FastEthernet0 & 192.168.1.1 & 255.255.255.0 \\
+PC1 & FastEthernet0 & 192.168.1.2 & 255.255.255.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{Procedure}
+\begin{enumerate}[leftmargin=1.8em]
+  \item Placed two \texttt{PC-PT} end devices, PC0 and PC1.
+  \item Selected \emph{Connections $\to$ Copper Cross-Over} and joined FastEthernet0 of
+  PC0 to FastEthernet0 of PC1. Both link LEDs turned green.
+  \item On each PC, \emph{Desktop $\to$ IP Configuration $\to$ Static}: entered the
+  address above. Packet Tracer fills in the /24 mask automatically. No gateway is needed,
+  because both hosts are on the same subnet.
+  \item \emph{Desktop $\to$ Command Prompt}: \texttt{ping 192.168.1.2} from PC0, then
+  \texttt{ping 192.168.1.1} from PC1.
+\end{enumerate}
+
+\subsubsection*{Results}
+\shot{q1_ping_pc0.png}{PC0 pings PC1 (192.168.1.2): 4 sent, 4 received, 0\% loss.}
+\shot{q1_ping_pc1.png}{PC1 pings PC0 (192.168.1.1): 4 sent, 4 received, 0\% loss.}
+
+\paragraph{Observations.} Both directions succeed with RTT $<$1\,ms and TTL\,=\,128 (the
+Windows default; no router decremented it). A cross-over cable is required here. A NIC
+transmits on pins 1--2 and receives on pins 3--6, so connecting two NICs directly needs the
+pairs swapped in the cable. A hub or switch normally does this swap internally.
+
+%--------------------------------------------------------------------------
+\subsection{Q2: LAN-A, Three Hosts on a Hub}
+
+\subsubsection*{Topology and Addressing}
+\shot[0.8\textwidth]{topo_q2.png}{Q2 topology: LAN-A, three PCs on a \texttt{Hub-PT}.}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Device} & \textbf{IPv4 address / mask} & \textbf{MAC address} & \textbf{Connected to} \\
+\midrule
+PC2 & 192.168.1.3/24 & 00D0.FFA5.37EE & Hub (straight-through) \\
+PC3 & 192.168.1.4/24 & 0090.2BE8.B750 & Hub (straight-through) \\
+PC4 & 192.168.1.5/24 & 0001.C70A.0697 & Hub (straight-through) \\
+\bottomrule
+\end{tabular}
+\caption{LAN-A hosts. MAC addresses are from the ARP tables recorded in Q4.}\label{tab:lana}
+\end{table}
+
+\subsubsection*{Procedure}
+\begin{enumerate}[leftmargin=1.8em]
+  \item Placed a \texttt{Hub-PT} (later relabelled ``LAN A'') and three PCs.
+  \item Connected each PC to the hub with a \textbf{copper straight-through} cable (host to
+  hub is a ``different device'' connection).
+  \item Assigned static addresses 192.168.1.3--.5/24.
+  \item Pinged every pair, in both directions: PC2$\to$PC3, PC2$\to$PC4, PC3$\to$PC2,
+  PC3$\to$PC4, PC4$\to$PC2, PC4$\to$PC3.
+\end{enumerate}
+
+\subsubsection*{Results}
+\shot{q2_ping_pc2.png}{PC2 pings PC3 (192.168.1.4) and PC4 (192.168.1.5). The very first
+attempt shows one lost request, after which all replies arrive.}
+\shot{q2_ping_all.png}{All pairs: PC2 (left) pings .4 and .5; PC4 (top right) pings .3
+and .4; PC3 (bottom right) pings .3 and .5. Every run ends with 0\% loss.}
+
+\paragraph{Observations.}
+\begin{itemize}[leftmargin=1.6em]
+  \item All six ordered pairs reach each other.
+  \item The first-ever ping to an address may lose its first request (PC2$\to$.4 above;
+  PC2 interrupted that run with Ctrl-C after one lost packet). The sender must first
+  broadcast an ARP request, and Packet Tracer drops the ICMP packet that triggered the
+  ARP rather than queuing it. Once the ARP reply is cached, every request succeeds.
+  \item A hub is a Layer-1 repeater. Every frame, unicast or broadcast, is repeated out of
+  every other port, so all three PCs share one collision domain and see each other's traffic.
+\end{itemize}
+
+%--------------------------------------------------------------------------
+\subsection{Q3: LAN-B, Three Hosts on a Switch (ARP and MAC Tables)}
+
+\subsubsection*{Topology and Addressing}
+\shot[0.8\textwidth]{topo_q3.png}{Q3 topology: LAN-B, three PCs on a \texttt{Switch-PT}, with
+the switch port of each host.}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Device} & \textbf{IPv4 address / mask} & \textbf{MAC address} & \textbf{Switch port} \\
+\midrule
+PC5 & 192.168.1.6/24 & 0030.F223.90E0 & FastEthernet0/1 \\
+PC6 & 192.168.1.7/24 & 0005.5ED3.1D1E & FastEthernet1/1 \\
+PC7 & 192.168.1.8/24 & 0002.16AA.B4DC & FastEthernet2/1 \\
+\bottomrule
+\end{tabular}
+\caption{LAN-B hosts. Ports are read from the switch's MAC table.}\label{tab:lanb}
+\end{table}
+
+\subsubsection*{Procedure}
+\begin{enumerate}[leftmargin=1.8em]
+  \item Placed a \texttt{Switch-PT} (later relabelled ``LAN B'') and PCs PC5--PC7, connected
+  with straight-through cables, and assigned 192.168.1.6--.8/24.
+  \item \textbf{Before any traffic:} ran \texttt{arp -a} on every PC and, in the switch
+  CLI, \texttt{enable} followed by \texttt{show mac address-table}.
+  \item Pinged every pair of hosts.
+  \item \textbf{After the pings:} repeated \texttt{arp -a} on each PC and
+  \texttt{show mac address-table} on the switch.
+\end{enumerate}
+
+\subsubsection*{Results: before pinging}
+\shot{q3_arp_before.png}{\texttt{arp -a} on PC5, PC6 and PC7 before any traffic: ``No ARP
+Entries Found'' on all three. (PC5 also ran \texttt{arp -d} to be sure the cache was empty.)}
+\shot{q3_mac_before.png}{Switch CLI before any traffic. The first attempt,
+\texttt{show mac-address table}, is rejected (wrong hyphen position). The correct
+\texttt{show mac address-table} returns an empty table. The amber link lights show the
+ports still coming up.}
+
+\subsubsection*{Results: pinging}
+\shot{q3_ping_pc5.png}{PC5 pings PC6 (192.168.1.7) and PC7 (192.168.1.8): 0\% loss.}
+\shot{q3_mac_after_pc5.png}{MAC table after PC5's pings (left): the switch has learned
+\texttt{0030.f223.90e0} (PC5) on Fa0/1 and \texttt{0002.16aa.b4dc} (PC7) on Fa2/1.}
+\shot{q3_ping_all.png}{The remaining pairs: PC6 (top left) pings .6 and .8, PC5 (top right)
+pings .7 and .8, PC7 (bottom right, starting from an empty ARP cache) pings .6 and .7. The
+last \texttt{show mac address-table} now holds all three hosts.}
+
+\subsubsection*{Results: after pinging}
+\shot{q3_arp_after.png}{\texttt{arp -a} after all pairs were pinged. Each PC has exactly two
+dynamic entries, one for each of the other two hosts.}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Host} & \textbf{ARP table before} & \textbf{ARP table after} \\
+\midrule
+PC5 (.6) & empty & .7 $\to$ 0005.5ed3.1d1e,\; .8 $\to$ 0002.16aa.b4dc \\
+PC6 (.7) & empty & .6 $\to$ 0030.f223.90e0,\; .8 $\to$ 0002.16aa.b4dc \\
+PC7 (.8) & empty & .6 $\to$ 0030.f223.90e0,\; .7 $\to$ 0005.5ed3.1d1e \\
+\bottomrule
+\end{tabular}
+\vspace{0.6em}
+
+\begin{tabular}{llll}
+\toprule
+\textbf{VLAN} & \textbf{MAC address} & \textbf{Type} & \textbf{Port} \\
+\midrule
+1 & 0002.16aa.b4dc (PC7) & DYNAMIC & Fa2/1 \\
+1 & 0005.5ed3.1d1e (PC6) & DYNAMIC & Fa1/1 \\
+1 & 0030.f223.90e0 (PC5) & DYNAMIC & Fa0/1 \\
+\bottomrule
+\end{tabular}
+\caption{Q3 summary: ARP tables before/after (top) and the switch's final MAC forwarding
+table (bottom). Before the pings the MAC table was empty.}
+\end{table}
+
+\paragraph{Observations.}
+\begin{itemize}[leftmargin=1.6em]
+  \item Both tables start empty and are filled \emph{only by traffic}. Neither is configured
+  by hand; every entry is of type \texttt{dynamic}/\texttt{DYNAMIC}.
+  \item The switch learns from the \emph{source} MAC of each frame arriving on a port. The
+  first ARP request (a broadcast) teaches it the sender's port, and the unicast reply teaches
+  it the target's port. Afterwards frames are forwarded only to the destination port instead
+  of being flooded like on the hub.
+  \item In the intermediate snapshot (after PC5's pings only) the entry for PC6 is missing,
+  although PC6 had replied to PC5. It appeared in the next listing, after PC6 had itself
+  sent pings. The final table has one entry per host, on the correct port.
+  \item An ARP entry is learned in both directions by one exchange. The host that answers
+  an ARP request also caches the requester's IP--MAC pair. That is why PC7's table already
+  had two entries even though it had only pinged twice.
+\end{itemize}
+
+%--------------------------------------------------------------------------
+\subsection{Q4: Joining LAN-A and LAN-B}
+
+\subsubsection*{Topology and Addressing}
+\shot{topo_q4.png}{Q4 topology: the hub of LAN-A and the switch of LAN-B joined by a
+cross-over cable. Addresses are unchanged from Q2 and Q3.}
+
+All six hosts keep their Q2/Q3 addresses (192.168.1.3--.8/24, MACs as in Tables~\ref{tab:lana} and~\ref{tab:lanb}).
+The new link runs from a hub port to switch port \textbf{FastEthernet3/1}.
+
+\subsubsection*{Procedure}
+\begin{enumerate}[leftmargin=1.8em]
+  \item Connected the hub (``LAN A'') to the switch (``LAN B'') with a \textbf{copper
+  cross-over} cable. Hub-to-switch is a ``like device'' connection (both are
+  interconnecting devices), so a cross-over cable is the correct choice. The switch end is
+  Fa3/1.
+  \item Pinged every LAN-A host from every LAN-B host and vice versa.
+  \item Recorded \texttt{arp -a} on all six PCs and \texttt{show mac-address-table} on the
+  switch.
+\end{enumerate}
+
+\subsubsection*{Results}
+\shot{q4_arp_all.png}{\texttt{arp -a} on all six hosts after the cross-LAN pings. PC6 (top
+left) and PC2--PC5, PC7 (right) each list the other \textbf{five} hosts.}
+\shot{q4_mac_table.png}{Switch ``LAN B'' MAC table after the cross-LAN pings: six entries.
+The three LAN-A hosts all appear on \textbf{Fa3/1}, the uplink to the hub.}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lllll}
+\toprule
+\textbf{VLAN} & \textbf{MAC address} & \textbf{Host} & \textbf{Type} & \textbf{Port} \\
+\midrule
+1 & 0001.c70a.0697 & PC4 (LAN-A) & DYNAMIC & Fa3/1 \\
+1 & 0002.16aa.b4dc & PC7 (LAN-B) & DYNAMIC & Fa2/1 \\
+1 & 0005.5ed3.1d1e & PC6 (LAN-B) & DYNAMIC & Fa1/1 \\
+1 & 0030.f223.90e0 & PC5 (LAN-B) & DYNAMIC & Fa0/1 \\
+1 & 0090.2be8.b750 & PC3 (LAN-A) & DYNAMIC & Fa3/1 \\
+1 & 00d0.ffa5.37ee & PC2 (LAN-A) & DYNAMIC & Fa3/1 \\
+\bottomrule
+\end{tabular}
+\caption{MAC forwarding table of the LAN-B switch after Q4.}
+\end{table}
+
+\paragraph{Observations.}
+\begin{itemize}[leftmargin=1.6em]
+  \item Every cross-LAN ping succeeds without a router, because both LANs are in the same IP
+  subnet and the hub--switch link merges them into one Layer-2 broadcast domain.
+  \item Every ARP table now has five entries (all hosts except itself), versus two in Q3.
+  \item Several MAC addresses mapping to \emph{one} switch port (Fa3/1) is the signature of
+  a shared segment behind that port. The switch cannot tell that a hub is there. It only
+  knows that those three MACs are reachable through Fa3/1. Traffic between two LAN-A hosts
+  never needs the switch, and if it arrives on Fa3/1 for a MAC also on Fa3/1, the switch
+  filters (drops) it rather than sending it back.
+  \item The switch still separates collision domains: LAN-B hosts each have a private one,
+  while the three LAN-A hosts and the switch's Fa3/1 share the hub's single collision domain.
+\end{itemize}
+
+%--------------------------------------------------------------------------
+\subsection{Q5: Two Routed LANs (JU-Main and JU-SL) with Static Routes}
+
+\subsubsection*{Topology and Addressing}
+\shot{topo_q5.png}{Q5 topology: JU-Main and JU-SL, each a 2950 switch with three PCs behind
+a 1841 router; the routers are joined by the 192.168.150.0/24 WAN link.}
+
+\begin{table}[H]
+\centering
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllll}
+\toprule
+\textbf{Device} & \textbf{Interface} & \textbf{IPv4 address / mask} & \textbf{MAC} & \textbf{Role} \\
+\midrule
+R1 (1841) & Fa0/0 & 192.168.148.1/24 & 0030.A3C5.8E01 & JU-Main gateway \\
+R1 (1841) & Fa0/1 & 192.168.150.1/24 & 0030.A3C5.8E02 & WAN \\
+R2 (1841) & Fa0/0 & 192.168.149.1/24 & 0010.11BE.0301 & JU-SL gateway \\
+R2 (1841) & Fa0/1 & 192.168.150.2/24 & 0010.11BE.0302 & WAN \\
+\midrule
+PC8, PC9, PC10 & Fa0 & 192.168.148.2, .3, .4 /24 & -- & JU-Main hosts, gw 192.168.148.1 \\
+PC12, PC13, PC14 & Fa0 & 192.168.149.2, .3, .4 /24 & -- & JU-SL hosts, gw 192.168.149.1 \\
+\midrule
+PC-LAB1-Switch & Fa0/1--0/4 & -- & base 0001.9770.0A01 & 2950-24, JU-Main \\
+PC-LAB2-Switch & -- & -- & -- & 2950-24, JU-SL \\
+\bottomrule
+\end{tabular}}
+\caption{Q5 addressing. Router addresses and MACs are from the device-info pop-ups
+(Figures~\ref{fig:q5_r1_info.png} and~\ref{fig:q5_r2_info.png}).}
+\label{tab:q5}
+\end{table}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Router} & \textbf{Destination network} & \textbf{Mask} & \textbf{Next hop} \\
+\midrule
+R1 & 192.168.149.0 & 255.255.255.0 & 192.168.150.2 (R2) \\
+R2 & 192.168.148.0 & 255.255.255.0 & 192.168.150.1 (R1) \\
+\bottomrule
+\end{tabular}
+\caption{Static routes. The 192.168.150.0/24 network and each router's own LAN are directly
+connected and need no route.}
+\label{tab:routes}
+\end{table}
+
+\subsubsection*{Procedure}
+\begin{enumerate}[leftmargin=1.8em]
+  \item \textbf{JU-Main:} placed a Cisco 2950-24 switch (hostname/label
+  \texttt{PC-LAB1-Switch}), three PCs (PC8--PC10) and router R1 (1841). Cabled PCs and R1
+  Fa0/0 to the switch with straight-through cables. Drew an ellipse labelled ``JU-Main''
+  around it.
+  \item \textbf{JU-SL:} the same with \texttt{PC-LAB2-Switch}, PC12--PC14 and R2.
+  \item \textbf{WAN:} joined R1 Fa0/1 and R2 Fa0/1 with a cross-over cable (router to
+  router is a like-device link). A FastEthernet point-to-point link was used instead of a
+  serial link, because the 1841 has no serial interface without an add-on WIC module. The
+  link plays the same WAN role, with its own subnet 192.168.150.0/24.
+  \item \textbf{Router interfaces:} in each router's \emph{Config} tab, set the IP and mask
+  of Fa0/0 and Fa0/1 and ticked \emph{Port Status: On} (Figures~\ref{fig:q5_r1_fa00.png},
+  \ref{fig:q5_r1_fa01.png}). The equivalent IOS commands are:
+\begin{lstlisting}
+R1(config)# interface FastEthernet0/0
+R1(config-if)# ip address 192.168.148.1 255.255.255.0
+R1(config-if)# no shutdown
+R1(config)# interface FastEthernet0/1
+R1(config-if)# ip address 192.168.150.1 255.255.255.0
+R1(config-if)# no shutdown
+\end{lstlisting}
+  \item \textbf{Hosts:} static IPs 192.168.148.2--.4 (JU-Main) and 192.168.149.2--.4
+  (JU-SL), mask 255.255.255.0, and
+  \emph{Default Gateway} = the router's Fa0/0 address (192.168.148.1 or 192.168.149.1).
+  \item \textbf{Static routes:} \emph{Config $\to$ Routing $\to$ Static} on each router,
+  with the entries of Table~\ref{tab:routes} (Figure~\ref{fig:q5_r1_static.png}). In IOS:
+\begin{lstlisting}
+R1(config)# ip route 192.168.149.0 255.255.255.0 192.168.150.2
+R2(config)# ip route 192.168.148.0 255.255.255.0 192.168.150.1
+\end{lstlisting}
+  \item Tested from PC8: ping own gateway, the far end of the WAN, and the far LAN's gateway.
+\end{enumerate}
+
+\subsubsection*{Results: configuration}
+\shot{q5_r1_fa00.png}{R1 \emph{Config $\to$ FastEthernet0/0}: port on, 192.168.148.1 /
+255.255.255.0, MAC 0030.A3C5.8E01. The IOS pane below shows \texttt{show ip route} being run.}
+\shot{q5_r1_fa01.png}{R1 \emph{Config $\to$ FastEthernet0/1}: 192.168.150.1 / 255.255.255.0.
+The IOS pane shows ``192.168.150.0/24 is directly connected, FastEthernet0/1''.}
+\shot{q5_r1_static.png}{R1 \emph{Config $\to$ Routing $\to$ Static}: the route
+\texttt{192.168.149.0/24 via 192.168.150.2}.}
+\shot{q5_r1_info.png}{Hover info for R1: Fa0/0 192.168.148.1/24 and Fa0/1 192.168.150.1/24,
+both up.}
+\shot{q5_r2_info.png}{Hover info for R2: Fa0/0 192.168.149.1/24 and Fa0/1 192.168.150.2/24,
+both up.}
+\shot{q5_switch_info.png}{Hover info for PC-LAB1-Switch (2950-24): Fa0/1--Fa0/4 up (three
+PCs and R1), Fa0/5--Fa0/24 down, all in VLAN 1.}
+
+\subsubsection*{Results: connectivity}
+\shot{q5_ping_pc8_1.png}{PC8 pings its gateway 192.168.148.1 (TTL\,=\,255) and the far end
+of the WAN link, 192.168.150.2 (TTL\,=\,254; first request timed out).}
+\shot{q5_ping_pc8_2.png}{PC8 pings JU-SL's gateway 192.168.149.1: 4/4 replies, TTL\,=\,254.}
+
+\paragraph{Observations.}
+\begin{itemize}[leftmargin=1.6em]
+  \item \textbf{Reachability proves both routes.} Echo \emph{requests} from PC8 to
+  192.168.149.1 use R1's static route. The \emph{replies} back to 192.168.148.0/24 can only
+  return through R2's static route to 192.168.148.0/24. Without that second route the
+  requests would arrive and the replies would be dropped.
+  \item \textbf{TTL counts the hops.} Router IOS sends replies with TTL 255. 192.168.148.1
+  replies with 255, so zero routers lie in between. 192.168.150.2 and 192.168.149.1 reply
+  with 254, because R1 forwarded the reply once.
+  \item \textbf{The first lost packet} to 192.168.150.2 is again ARP. R1 had never resolved
+  R2's Fa0/1 MAC and dropped the first packet while it did.
+\end{itemize}
+
+%--------------------------------------------------------------------------
+\subsection{Q6: DHCP Servers in JU-Main and JU-SL}
+
+\subsubsection*{Topology and Addressing}
+\shot{topo_q6.png}{Q6 topology: Q5 plus one DHCP server in each LAN; hosts now obtain their
+addresses dynamically.}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Setting} & \textbf{Server0 (JU-Main)} & \textbf{Server1 (JU-SL)} \\
+\midrule
+Server's own address (static) & 192.168.148.10/24 & 192.168.149.10/24 \\
+Server's gateway / DNS & 192.168.148.1 / 8.8.8.8 & 192.168.149.1 / 8.8.8.8 \\
+\midrule
+DHCP pool name & \texttt{JU-Main} & \texttt{JU-SL} \\
+Default gateway handed out & 192.168.148.1 & 192.168.149.1 \\
+DNS server handed out & 8.8.8.8 & 8.8.8.8 \\
+Start address & 192.168.148.100 & 192.168.149.100 \\
+Subnet mask & 255.255.255.0 & 255.255.255.0 \\
+Maximum users & 156 (.100--.255) & 156 (.100--.255) \\
+\midrule
+Leases observed & PC8 $\to$ 192.168.148.101 & PC13 $\to$ 192.168.149.101; \\
+ & & 192.168.149.100 also leased \\
+\bottomrule
+\end{tabular}
+\caption{DHCP configuration. Routers and WAN are unchanged from Table~\ref{tab:q5}.}
+\end{table}
+
+\subsubsection*{Procedure}
+\begin{enumerate}[leftmargin=1.8em]
+  \item Added a \texttt{Server-PT} to each LAN switch (Server0 in JU-Main, Server1 in JU-SL).
+  \item Gave each server a \textbf{static} address (.10) outside the range it will hand out,
+  with the router as its gateway (Figure~\ref{fig:q6_server_ip.png}).
+  \item \emph{Services $\to$ DHCP}: turned the service \emph{On}, entered a new pool
+  (\texttt{JU-Main} / \texttt{JU-SL}) with the values in the table and pressed \emph{Add}
+  (Figure~\ref{fig:q6_dhcp_pools.png}).
+  \item On every host: \emph{IP Configuration $\to$ DHCP}.
+  \item Verified with \texttt{ipconfig} and a ping across both routers.
+\end{enumerate}
+
+\subsubsection*{Results}
+\shot{q6_server_ip.png}{Static IP configuration of Server0 (192.168.148.10) and Server1
+(192.168.149.10), each with its router as default gateway.}
+\shot{q6_dhcp_pools.png}{DHCP service on both servers. Server0's pool \texttt{JU-Main}: gateway
+192.168.148.1, start 192.168.148.100, 156 users. Server1's pool \texttt{JU-SL}: gateway
+192.168.149.1, start 192.168.149.100.}
+\shot{q6_pc13_dhcp.png}{PC13 (JU-SL) set to DHCP: ``DHCP request successful''. It received
+192.168.149.101 / 255.255.255.0, gateway 192.168.149.1, DNS 8.8.8.8.}
+\shot{q6_pc8_ipconfig.png}{\texttt{ipconfig} on PC8 (JU-Main): 192.168.148.101 /
+255.255.255.0, default gateway 192.168.148.1, all from Server0.}
+\shot{q6_pc8_ping.png}{PC8 (DHCP address) pings a DHCP-configured host in JU-SL,
+192.168.149.100: 3 of 4 replies, TTL\,=\,126.}
+
+\paragraph{Observations.}
+\begin{itemize}[leftmargin=1.6em]
+  \item The address, mask \emph{and} default gateway all came from DHCP. The gateway is
+  what lets the DHCP hosts keep using Q5's static routes; the cross-LAN ping succeeds.
+  \item TTL\,=\,126 on the reply is the PC default 128 minus two router hops (R2 and R1),
+  confirming the packet crossed both routers. The first request was lost to ARP resolution
+  at R2 for the new host's address.
+  \item A DHCP DISCOVER is a broadcast and routers do not forward broadcasts. That is why
+  each LAN needs its own DHCP server, as the assignment specifies. The alternative is a
+  single server plus \texttt{ip helper-address} on each router's LAN interface.
+  \item The pool starts at .100, so it never collides with the statically addressed router
+  (.1) and server (.10). The hosts move from their Q5 static addresses (.2--.4) to leases
+  from .100 onwards.
+  \item DNS 8.8.8.8 is a placeholder required by the form; no DNS is used in this question.
+\end{itemize}
+
+%--------------------------------------------------------------------------
+\subsection{Q7: The CSE LAN with DHCP, DNS, Web and FTP Servers}
+
+\subsubsection*{Topology and Addressing}
+\shot[0.92\textwidth]{topo_q7.png}{Q7 topology: the CSE LAN. Three DHCP clients and four
+statically addressed servers on one 2950 switch.}
+
+\begin{table}[H]
+\centering
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllll}
+\toprule
+\textbf{Device} & \textbf{IPv4 address} & \textbf{How assigned} & \textbf{DNS server} & \textbf{DNS name} \\
+\midrule
+DHCP Server & 192.168.151.10/24 & static & 192.168.151.13 & -- \\
+WebServer & 192.168.151.11/24 & static & 192.168.151.13 & \texttt{www.cse.myuniv.edu} \\
+FTP Server & 192.168.151.12/24 & static & 192.168.151.13 & \texttt{ftp.cse.myuniv.edu} \\
+DNS Server & 192.168.151.13/24 & static & 192.168.151.13 & -- \\
+\midrule
+CSE-PC1 & 192.168.151.100/24 & DHCP & 192.168.151.13 (via DHCP) & -- \\
+CSE-PC2, CSE-PC3 & from pool (.100 onwards) & DHCP & 192.168.151.13 (via DHCP) & -- \\
+\midrule
+CSE-Switch & -- & -- & -- & Cisco 2950-24 \\
+\bottomrule
+\end{tabular}}
+\caption{Q7 addressing. The LAN has no router, so the default gateway is 0.0.0.0 everywhere.}
+\end{table}
+
+\subsubsection*{Procedure}
+\begin{enumerate}[leftmargin=1.8em]
+  \item Placed a 2950-24 switch \texttt{CSE-Switch}, three PCs (CSE-PC1--3) and four
+  \texttt{Server-PT}s (DHCP Server, WebServer, FTP Server, DNS Server), all on
+  straight-through cables.
+  \item \textbf{Static server addresses} 192.168.151.10--.13/24, each with DNS server
+  192.168.151.13 (Figure~\ref{fig:q7_server_ips.png}).
+  \item \textbf{DHCP Server:} \emph{Services $\to$ DHCP} On; pool \texttt{serverPool}
+  with start 192.168.151.100, mask 255.255.255.0, \textbf{DNS server 192.168.151.13}, gateway
+  0.0.0.0, maximum users 50 (Figure~\ref{fig:q7_dhcp_pool.png}). Handing out the DNS address
+  through DHCP is what ``configures the individual hosts to use the local DNS server''.
+  \item \textbf{DNS Server:} \emph{Services $\to$ DNS} On; added A records
+  (Figures~\ref{fig:q7_dns_record1.png}, \ref{fig:q7_dns_records.png}):
+  \begin{center}
+  \begin{tabular}{lll}
+  \toprule
+  \textbf{Name} & \textbf{Type} & \textbf{Address} \\
+  \midrule
+  \texttt{www.cse.myuniv.edu} & A & 192.168.151.11 \\
+  \texttt{ftp.cse.myuniv.edu} & A & 192.168.151.12 \\
+  \bottomrule
+  \end{tabular}
+  \end{center}
+  A first draft had a single record for the bare domain \texttt{cse.myuniv.edu}. It was
+  replaced by one host name per server under the domain.
+  \item \textbf{WebServer:} \emph{Services $\to$ HTTP}; edited \texttt{index.html} to a CSE
+  welcome page (Figure~\ref{fig:q7_web_index.png}).
+  \item \textbf{FTP Server:} \emph{Services $\to$ FTP} On; added user \texttt{sajjad}
+  (permissions Read, Write, List) and \texttt{admin} (all permissions) alongside the default
+  \texttt{cisco} (Figure~\ref{fig:q7_ftp_users.png}).
+  \item \textbf{Hosts:} \emph{IP Configuration $\to$ DHCP}.
+  \item Tested name resolution with \texttt{ping} by name, \texttt{http://www.cse.myuniv.edu}
+  in the PC's Web Browser, and \texttt{ftp ftp.cse.myuniv.edu} from the command prompt.
+\end{enumerate}
+
+\subsubsection*{Results: configuration}
+\shot{q7_server_ips.png}{Static IP configuration of the four servers: DHCP .10, WebServer .11,
+FTP .12, DNS .13. All point to 192.168.151.13 for DNS.}
+\shot{q7_dhcp_pool.png}{DHCP Server pool: DNS 192.168.151.13, start 192.168.151.100 /
+255.255.255.0, maximum users being set to 50.}
+\shot{q7_dns_record1.png}{DNS Server, first draft: one A record \texttt{cse.myuniv.edu}
+$\to$ 192.168.151.11.}
+\shot{q7_dns_records.png}{DNS Server, final records: \texttt{www.cse.myuniv.edu} $\to$
+192.168.151.11 and \texttt{ftp.cse.myuniv.edu} $\to$ 192.168.151.12.}
+\shot{q7_web_index.png}{WebServer HTTP service: the edited \texttt{index.html}.}
+\shot{q7_ftp_users.png}{FTP Server users: \texttt{cisco} (RWDNL), \texttt{sajjad} (RWL),
+\texttt{admin} (RWDNL). R/W/D/N/L = Read, Write, Delete, reName, List.}
+\shot{q7_pc1_dhcp.png}{CSE-PC1 on DHCP: 192.168.151.100 / 255.255.255.0, gateway 0.0.0.0,
+DNS server 192.168.151.13, all received from the DHCP Server.}
+
+\subsubsection*{Results: services}
+\shot{q7_ping_names.png}{CSE-PC1 pings by name: \texttt{www.cse.myuniv.edu} resolves to
+192.168.151.11 and \texttt{ftp.cse.myuniv.edu} to 192.168.151.12. 0\% loss on both.}
+\shot{q7_browser.png}{CSE-PC1's Web Browser at \texttt{http://www.cse.myuniv.edu}: the page
+served by WebServer.}
+\shot{q7_ftp_session.png}{FTP session from CSE-PC1: \texttt{ftp ftp.cse.myuniv.edu},
+\texttt{220 Welcome}, user \texttt{sajjad}, \texttt{230 Logged in}, then \texttt{dir} lists
+the server's \texttt{/ftp} directory. (Packet Tracer's client does not support \texttt{ls}.)}
+
+\paragraph{Observations.}
+\begin{itemize}[leftmargin=1.6em]
+  \item One chain links all four services. DHCP gives CSE-PC1 an address \emph{and} the DNS
+  server's address. DNS turns \texttt{www}/\texttt{ftp.cse.myuniv.edu} into .11/.12. HTTP
+  and FTP then connect to those addresses. The \texttt{Pinging 192.168.151.11} line shows the
+  resolved address that \texttt{ping} actually used.
+  \item Servers are static, so their DNS records never go stale. Hosts are dynamic, and
+  nothing needs to resolve \emph{them} by name.
+  \item The FTP exchange shows the protocol's numeric replies: 220 (service ready), 331
+  (user OK, need password), 230 (logged in).
+  \item No router or gateway is needed, because every device is on 192.168.151.0/24.
+\end{itemize}
+
+%==========================================================================
+\section{Analysis}
+
+\subsection{Hub vs.\ switch, from the tables}
+Q2--Q4 show the difference between Layer 1 and Layer 2 directly. The hub has no table at
+all; it repeats every bit. The switch starts with an empty MAC table and builds it purely
+from source addresses (Q3). In Q4 three MACs share port Fa3/1, which is how a switch sees
+a hub (or another switch) behind one of its ports. ARP is the bridge between Layers 2 and 3.
+Its tables fill only on demand, and a single request/reply exchange teaches \emph{both}
+hosts.
+
+\subsection{What a router changes}
+Q4 joins two LANs \emph{without} a router, and it works only because they share one subnet
+and become one broadcast domain. Q5 joins two LANs in \emph{different} subnets, which needs
+(a) a router interface in each subnet, (b) a default gateway on each host, and (c) a route
+on each router for every non-attached network, in \emph{both} directions. The TTL values make
+the router hops visible: 128 between PCs on one LAN, 255/254 from the routers, 126 across
+two routers.
+
+\subsection{From manual to automatic configuration}
+Q5 configured every host by hand. Q6 replaced that with DHCP: one pool per LAN delivers the
+address, mask and gateway. Q7 adds DNS: hosts learn the DNS server from DHCP, and users name
+services instead of addresses. Each layer of automation depends on the one below: DHCP
+needs Layer-2 broadcast reachability, DNS needs a correct DHCP option, and HTTP/FTP need
+DNS.
+
+\subsection{The ``first ping lost'' pattern}
+Q2, Q5 and Q6 each lost exactly one request the first time a new next-hop was used. Every
+case was an ARP miss. Packet Tracer (like many real IP stacks) drops the packet that
+triggers ARP resolution instead of queuing it. It is not a configuration fault, and a
+repeated ping always showed 0\% loss.
+
+%==========================================================================
+\section{Comments}
+
+\paragraph{Evaluation of the Lab Assignment.} The assignment builds up one layer at a
+time, and each question reuses the previous one. LAN-A and LAN-B from Q2/Q3 are joined in
+Q4, and the routed network of Q5 gains DHCP in Q6. Recording the ARP and MAC tables before
+and after traffic made address learning concrete in a way the earlier socket-based
+assignments could not.
+
+\paragraph{Difficulty.} The difficulty was mostly in Packet Tracer details. The router
+model named in the problem (``1818'') does not exist, so the 1841 was used. The 1841 has no
+serial port without a WIC module, so the WAN link was made with FastEthernet. The IOS
+syntax is \texttt{show mac address-table} (a mistyped \texttt{show mac-address table} is
+rejected, Figure~\ref{fig:q3_mac_before.png}). The PC's FTP client accepts \texttt{dir} but
+not \texttt{ls}. The one-lost-ping-on-ARP behaviour also looks like a fault until its cause
+is understood.
+
+\paragraph{Suggested Improvements.} Correct the router model (1841 or 1941), and say
+whether the WAN link should be serial (which would teach clock rate and DCE/DTE) or
+Ethernet. In Q7, ask for a router as well, so that the CSE LAN can be connected to the
+JU-Main/JU-SL network and DNS names resolved across subnets.
+
+\end{document}

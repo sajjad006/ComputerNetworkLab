@@ -1,0 +1,23 @@
+=== ARP LAN Hub (Windows / Linux / macOS) ===
+Port 9200
+Broadcast ARP Request | Unicast ARP Reply
+
+[+] host socket connected
+Host registered IP=192.168.1.1 MAC=02:00:00:00:00:01
+[+] host socket connected
+Host registered IP=192.168.1.2 MAC=02:00:00:00:00:02
+ARP REQUEST who-has 192.168.1.1  tell 192.168.1.2 (02:00:00:00:00:02)  [BROADCAST]
+ARP REPLY 192.168.1.1 is-at 02:00:00:00:00:01  -> 02:00:00:00:00:02  [UNICAST]
+ARP REQUEST who-has 192.168.1.9  tell 192.168.1.2 (02:00:00:00:00:02)  [BROADCAST]
+ARP REQUEST who-has 192.168.1.1  tell 192.168.1.1 (02:00:00:00:00:01)  [BROADCAST] (gratuitous)
+[+] host socket connected
+Host registered IP=192.168.1.1 MAC=02:00:00:00:00:99
+ARP REQUEST who-has 192.168.1.1  tell 192.168.1.1 (02:00:00:00:00:99)  [BROADCAST] (gratuitous)
+[-] host 192.168.1.1 left
+[+] host socket connected
+Host registered IP=192.168.1.4 MAC=02:00:00:00:00:04
+ARP REQUEST who-has 192.168.1.1  tell 192.168.1.4 (02:00:00:00:00:04)  [BROADCAST]
+ARP REQUEST who-has 192.168.1.2  tell 192.168.1.4 (02:00:00:00:00:04)  [BROADCAST]
+ARP REPLY 192.168.1.1 is-at 02:00:00:00:00:01  -> 02:00:00:00:00:04  [UNICAST]
+ARP REPLY 192.168.1.2 is-at 02:00:00:00:00:02  -> 02:00:00:00:00:04  [UNICAST]
+[-] host 192.168.1.4 left

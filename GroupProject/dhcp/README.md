@@ -3,7 +3,7 @@
 | File | What it is |
 |---|---|
 | `dhcp_packet.h` | DHCP packet layout and option helpers, shared by both programs |
-| `Dhcp.cpp` | DHCP **client**: DISCOVER → OFFER → REQUEST → ACK (Linux / macOS / Windows) |
+| `Dhcp.cpp` | DHCP **client**: DISCOVER → OFFER → REQUEST → ACK (Linux / macOS) |
 | `DhcpServer.cpp` | DHCP **server**: address pool, lease table, OFFER / ACK / NAK, RELEASE, DECLINE (Linux / macOS) |
 | `demo.sh` | Builds a virtual LAN on Linux (router + 3 PCs) and runs the demo |
 | `udhcpc_hook.sh` | Helper for `demo.sh udhcpc` (BusyBox's DHCP client against our server) |
@@ -30,10 +30,9 @@ and finally `cleanup`.
 
 ## Client against a real router
 ```
-g++ -std=c++17 -o dhcp_client Dhcp.cpp                       # macOS / Linux
-g++ -std=c++17 -o dhcp_client Dhcp.cpp -lws2_32 -liphlpapi   # Windows (MinGW)
+g++ -std=c++17 -o dhcp_client Dhcp.cpp     # Linux / macOS
 sudo ./dhcp_client                 # lists interfaces and asks which one
-sudo ./dhcp_client en0             # macOS Wi-Fi (Linux: wlan0 / eth0, Windows: "Wi-Fi")
+sudo ./dhcp_client en0             # macOS Wi-Fi (Linux: wlan0 / eth0)
 sudo ./dhcp_client en0 aa:bb:cc:dd:ee:ff   # only if macOS hides the interface MAC
 ```
 It prints the OFFER and ACK and does not change your settings (unless `--apply`, Linux only).

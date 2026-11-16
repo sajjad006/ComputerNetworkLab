@@ -5,11 +5,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
-#ifdef _WIN32
-    #include <winsock2.h>
-#else
-    #include <arpa/inet.h>
-#endif
+#include <arpa/inet.h>   // htonl / ntohl
 
 // ---------------------------------------------------------------- Constants
 constexpr uint16_t SERVER_PORT = 67;

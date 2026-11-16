@@ -1,0 +1,8 @@
+hosts,lookups_per_round,round1_requests,round1_replies,round2_requests,round2_replies,cache_hits_total,frames_delivered_round1
+2,2,1,1,0,0,3,2
+3,6,3,3,0,0,9,9
+4,12,6,6,0,0,18,24
+5,20,10,10,0,0,30,50
+6,30,15,15,0,0,45,90
+7,42,21,21,0,0,63,147
+8,56,28,28,0,0,84,224

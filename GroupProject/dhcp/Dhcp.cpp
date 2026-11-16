@@ -1,8 +1,7 @@
 // DHCP client: DISCOVER -> OFFER -> REQUEST -> ACK (RFC 2131).
 // It only obtains a lease and prints it; it does not change the OS network settings.
 //
-// Build:  g++ -std=c++17 -o dhcp_client Dhcp.cpp                       (Linux / macOS)
-//         g++ -std=c++17 -o dhcp_client Dhcp.cpp -lws2_32 -liphlpapi   (Windows MinGW)
+// Build:  g++ -std=c++17 -o dhcp_client Dhcp.cpp      (Linux / macOS)
 // Run:    sudo ./dhcp_client [interface] [MAC] [--apply]
 //         --apply (Linux only): put the leased IP and default route on the interface.
 
@@ -19,36 +18,17 @@
 #include <cctype>
 
 // ---------------------------------------------------------------- OS headers
-#ifdef _WIN32
-    #ifndef _WIN32_WINNT
-        #define _WIN32_WINNT 0x0600
-    #endif
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #include <iphlpapi.h>
-    #ifdef _MSC_VER
-        #pragma comment(lib, "Ws2_32.lib")
-        #pragma comment(lib, "Iphlpapi.lib")
-    #endif
-    using SocketHandle = SOCKET;
-    using SocketLength = int;
-    constexpr SocketHandle INVALID_SOCKET_HANDLE = INVALID_SOCKET;
-#else
-    #include <sys/socket.h>
-    #include <sys/time.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    #include <ifaddrs.h>
-    #include <net/if.h>
-    #ifdef __APPLE__
-        #include <net/if_dl.h>
-    #elif defined(__linux__)
-        #include <netpacket/packet.h>
-    #endif
-    using SocketHandle = int;
-    using SocketLength = socklen_t;
-    constexpr SocketHandle INVALID_SOCKET_HANDLE = -1;
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#ifdef __APPLE__
+    #include <net/if_dl.h>        // AF_LINK: read the MAC on macOS
+#elif defined(__linux__)
+    #include <netpacket/packet.h> // AF_PACKET: read the MAC on Linux
 #endif
 
 #include "dhcp_packet.h"
@@ -74,26 +54,14 @@ struct ParsedReply {
 
 // ---------------------------------------------------------------- Small helpers
 void printSocketError(const char* operation) {
-#ifdef _WIN32
-    std::fprintf(stderr, "%s failed: %d\n", operation, WSAGetLastError());
-#else
     int error = errno;
     std::perror(operation);
-    #ifdef __APPLE__
+#ifdef __APPLE__
     if (error == EHOSTUNREACH || error == EACCES)
         std::fprintf(stderr, "Check System Settings > Privacy & Security > Local Network "
                              "for this terminal.\n");
-    #endif
+#endif
     (void)error;
-#endif
-}
-
-void closeSocket(SocketHandle sock) {
-#ifdef _WIN32
-    closesocket(sock);
-#else
-    close(sock);
-#endif
 }
 
 void printMac(const uint8_t* mac) {
@@ -121,8 +89,7 @@ bool parseMac(const char* text, uint8_t mac[6]) {
 
 // ---------------------------------------------------------------- Network interfaces
 struct ClientInterface {
-    std::string name;        // name the user types (e.g. en0, wlan0, "Wi-Fi")
-    std::string systemName;  // name the OS APIs need
+    std::string name;        // e.g. en0 (macOS), wlan0 / eth0 (Linux)
     uint8_t mac[6]{};
     unsigned index{};
     bool macHidden{};        // macOS can report 02:00:00:00:00:00 instead of the real MAC
@@ -131,35 +98,6 @@ struct ClientInterface {
 // List active, non-loopback interfaces that have a 6-byte MAC.
 std::vector<ClientInterface> listInterfaces() {
     std::vector<ClientInterface> list;
-#ifdef _WIN32
-    std::vector<unsigned char> storage(15000);
-    ULONG size = static_cast<ULONG>(storage.size());
-    auto* adapters = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(storage.data());
-    ULONG result = GetAdaptersAddresses(AF_INET, 0, nullptr, adapters, &size);
-    if (result == ERROR_BUFFER_OVERFLOW) {
-        storage.resize(size);
-        adapters = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(storage.data());
-        result = GetAdaptersAddresses(AF_INET, 0, nullptr, adapters, &size);
-    }
-    if (result != NO_ERROR) {
-        std::fprintf(stderr, "GetAdaptersAddresses failed: %lu\n", result);
-        return list;
-    }
-    for (auto* a = adapters; a; a = a->Next) {
-        if (a->OperStatus != IfOperStatusUp || a->PhysicalAddressLength != 6 || !a->IfIndex)
-            continue;
-        char friendly[512]{};
-        if (a->FriendlyName)
-            WideCharToMultiByte(CP_UTF8, 0, a->FriendlyName, -1, friendly, sizeof(friendly),
-                                nullptr, nullptr);
-        ClientInterface ci;
-        ci.systemName = a->AdapterName;
-        ci.name = friendly[0] ? friendly : a->AdapterName;
-        ci.index = a->IfIndex;
-        std::memcpy(ci.mac, a->PhysicalAddress, 6);
-        list.push_back(ci);
-    }
-#else
     ifaddrs* addresses = nullptr;
     if (getifaddrs(&addresses) != 0) {
         std::perror("getifaddrs");
@@ -168,20 +106,20 @@ std::vector<ClientInterface> listInterfaces() {
     for (auto* e = addresses; e; e = e->ifa_next) {
         if (!e->ifa_addr || !(e->ifa_flags & IFF_UP) || (e->ifa_flags & IFF_LOOPBACK)) continue;
         const void* mac = nullptr;
-    #ifdef __APPLE__
+#ifdef __APPLE__
         if (e->ifa_addr->sa_family == AF_LINK) {
             auto* link = reinterpret_cast<const sockaddr_dl*>(e->ifa_addr);
             if (link->sdl_alen == 6) mac = LLADDR(link);
         }
-    #elif defined(__linux__)
+#elif defined(__linux__)
         if (e->ifa_addr->sa_family == AF_PACKET) {
             auto* link = reinterpret_cast<const sockaddr_ll*>(e->ifa_addr);
             if (link->sll_halen == 6) mac = link->sll_addr;
         }
-    #endif
+#endif
         if (!mac) continue;
         ClientInterface ci;
-        ci.name = ci.systemName = e->ifa_name;
+        ci.name = e->ifa_name;
         ci.index = if_nametoindex(e->ifa_name);
         std::memcpy(ci.mac, mac, 6);
         const uint8_t placeholder[6] = {2, 0, 0, 0, 0, 0};
@@ -189,32 +127,26 @@ std::vector<ClientInterface> listInterfaces() {
         if (ci.index != 0) list.push_back(ci);
     }
     freeifaddrs(addresses);
-#endif
     return list;
 }
 
 // ---------------------------------------------------------------- Socket
 // UDP socket: broadcast allowed, tied to one interface, 1 s receive timeout, bound to port 68.
-SocketHandle createClientSocket(const ClientInterface& iface) {
-    SocketHandle sock = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (sock == INVALID_SOCKET_HANDLE) {
+int createClientSocket(const ClientInterface& iface) {
+    int sock = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sock < 0) {
         printSocketError("socket");
-        return INVALID_SOCKET_HANDLE;
+        return -1;
     }
 
     int on = 1;
-#ifdef _WIN32
-    DWORD timeout = 1000;  // ms
-#else
     timeval timeout{1, 0};
-#endif
     sockaddr_in local{};
     local.sin_family = AF_INET;
     local.sin_port = htons(CLIENT_PORT);
     local.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    bool ok = ::setsockopt(sock, SOL_SOCKET, SO_BROADCAST,
-                           reinterpret_cast<const char*>(&on), sizeof(on)) == 0;
+    bool ok = ::setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on)) == 0;
     if (!ok) printSocketError("SO_BROADCAST");
 
     // Make the broadcast leave through the chosen interface.
@@ -223,83 +155,47 @@ SocketHandle createClientSocket(const ClientInterface& iface) {
                                   &iface.index, sizeof(iface.index)) == 0))
         printSocketError("IP_BOUND_IF");
 #elif defined(__linux__)
-    if (ok && !(ok = ::setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, iface.systemName.c_str(),
-                                  static_cast<socklen_t>(iface.systemName.size() + 1)) == 0))
+    if (ok && !(ok = ::setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, iface.name.c_str(),
+                                  static_cast<socklen_t>(iface.name.size() + 1)) == 0))
         printSocketError("SO_BINDTODEVICE");
-#else
-    (void)iface;  // Windows picks the adapter per packet in sendPacket (IP_PKTINFO).
 #endif
 
-    if (ok && !(ok = ::setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,
-                                  reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == 0))
+    if (ok && !(ok = ::setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) == 0))
         printSocketError("SO_RCVTIMEO");
     if (ok && !(ok = ::bind(sock, reinterpret_cast<const sockaddr*>(&local), sizeof(local)) == 0))
         printSocketError("bind port 68 (run with sudo; stop any other DHCP client)");
 
     if (!ok) {
-        closeSocket(sock);
-        return INVALID_SOCKET_HANDLE;
+        close(sock);
+        return -1;
     }
     return sock;
 }
 
 // Broadcast a packet to 255.255.255.255:67.
-bool sendPacket(SocketHandle sock, const Dhcp_packet_t& packet, std::size_t length,
-                unsigned interfaceIndex) {
+bool sendPacket(int sock, const Dhcp_packet_t& packet, std::size_t length) {
     sockaddr_in to{};
     to.sin_family = AF_INET;
     to.sin_port = htons(SERVER_PORT);
     to.sin_addr.s_addr = htonl(INADDR_BROADCAST);
-
-#ifdef _WIN32
-    // Windows has no SO_BINDTODEVICE: attach IP_PKTINFO to choose the outgoing adapter.
-    WSABUF buffer{};
-    buffer.buf = const_cast<char*>(reinterpret_cast<const char*>(&packet));
-    buffer.len = static_cast<ULONG>(length);
-    alignas(WSACMSGHDR) char control[WSA_CMSG_SPACE(sizeof(IN_PKTINFO))]{};
-    WSAMSG message{};
-    message.name = reinterpret_cast<sockaddr*>(&to);
-    message.namelen = sizeof(to);
-    message.lpBuffers = &buffer;
-    message.dwBufferCount = 1;
-    message.Control.buf = control;
-    message.Control.len = sizeof(control);
-    auto* header = WSA_CMSG_FIRSTHDR(&message);
-    header->cmsg_level = IPPROTO_IP;
-    header->cmsg_type = IP_PKTINFO;
-    header->cmsg_len = WSA_CMSG_LEN(sizeof(IN_PKTINFO));
-    reinterpret_cast<IN_PKTINFO*>(WSA_CMSG_DATA(header))->ipi_ifindex = interfaceIndex;
-    DWORD sent = 0;
-    if (WSASendMsg(sock, &message, 0, &sent, nullptr, nullptr) != 0) {
-        printSocketError("WSASendMsg");
-        return false;
-    }
-#else
-    (void)interfaceIndex;  // the socket is already tied to the interface
     long sent = ::sendto(sock, &packet, length, 0, reinterpret_cast<const sockaddr*>(&to),
                          sizeof(to));
     if (sent < 0) {
         printSocketError("sendto");
         return false;
     }
-#endif
     return static_cast<std::size_t>(sent) == length;
 }
 
 // Returns bytes received, 0 if nothing usable arrived within the timeout, -1 on error.
-int receivePacket(SocketHandle sock, Dhcp_packet_t& packet) {
+int receivePacket(int sock, Dhcp_packet_t& packet) {
     char buffer[2048];
     sockaddr_in from{};
-    SocketLength fromLength = sizeof(from);
+    socklen_t fromLength = sizeof(from);
     int n = static_cast<int>(::recvfrom(sock, buffer, sizeof(buffer), 0,
                                         reinterpret_cast<sockaddr*>(&from), &fromLength));
     if (n < 0) {
-#ifdef _WIN32
-        int error = WSAGetLastError();
-        if (error == WSAETIMEDOUT || error == WSAEWOULDBLOCK || error == WSAEMSGSIZE) return 0;
-#else
-        if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
-#endif
+        if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;   // 1 s timeout
         printSocketError("recvfrom");
         return -1;
     }
@@ -389,12 +285,11 @@ void printReply(const ParsedReply& r) {
 // ---------------------------------------------------------------- One request/reply step
 // Send `packet`, wait up to 4 s for the wanted reply, retransmit up to 3 times.
 // When waiting for ACK, a NAK from the chosen server also ends the wait.
-bool exchange(SocketHandle sock, const Dhcp_packet_t& packet, std::size_t length,
-              unsigned ifIndex, const ClientContext& client, uint8_t wantedType,
-              ParsedReply& reply) {
+bool exchange(int sock, const Dhcp_packet_t& packet, std::size_t length,
+              const ClientContext& client, uint8_t wantedType, ParsedReply& reply) {
     using Clock = std::chrono::steady_clock;
     for (int attempt = 1; attempt <= 3; ++attempt) {
-        if (!sendPacket(sock, packet, length, ifIndex)) return false;
+        if (!sendPacket(sock, packet, length)) return false;
         std::printf("Sent DHCP%s (%zu bytes, XID 0x%08x), attempt %d/3\n",
                     wantedType == DHCPOFFER ? "DISCOVER" : "REQUEST", length,
                     unsigned(client.transactionId), attempt);
@@ -457,20 +352,12 @@ int main(int argc, char* argv[]) {
     std::string macText = args.size() > 1 ? args[1] : "";
     if (args.size() > 2 || name == "--help" || name == "-h") {
         std::printf("Usage: sudo %s [interface] [MAC] [--apply]\n"
-                    "  interface: en0 (macOS), wlan0/eth0 (Linux), \"Wi-Fi\" (Windows)\n"
+                    "  interface: en0 (macOS), wlan0 / eth0 (Linux)\n"
                     "  MAC:       only needed when macOS hides the interface's MAC\n"
                     "  --apply:   Linux only, configure the interface with the leased IP\n",
                     argv[0]);
         return args.size() > 2;
     }
-
-#ifdef _WIN32
-    WSADATA wsa{};
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-        std::fprintf(stderr, "WSAStartup failed\n");
-        return 1;
-    }
-#endif
 
     // 1. Pick the interface (ask if not given on the command line).
     auto interfaces = listInterfaces();
@@ -485,7 +372,7 @@ int main(int argc, char* argv[]) {
     }
     const ClientInterface* found = nullptr;
     for (const auto& ci : interfaces)
-        if (ci.name == name || ci.systemName == name) found = &ci;
+        if (ci.name == name) found = &ci;
     if (!found) {
         std::fprintf(stderr, "Interface '%s' not found or not up.\n", name.c_str());
         return 1;
@@ -515,8 +402,8 @@ int main(int argc, char* argv[]) {
     std::random_device rd;
     client.transactionId = std::uniform_int_distribution<uint32_t>(1, UINT32_MAX)(rd);
 
-    SocketHandle sock = createClientSocket(iface);
-    if (sock == INVALID_SOCKET_HANDLE) return 1;
+    int sock = createClientSocket(iface);
+    if (sock < 0) return 1;
 
     bool leased = false;
     Dhcp_packet_t packet{};
@@ -524,14 +411,14 @@ int main(int argc, char* argv[]) {
 
     // 3. DISCOVER -> OFFER
     std::size_t length = buildPacket(packet, DHCPDISCOVER, client);
-    if (exchange(sock, packet, length, iface.index, client, DHCPOFFER, reply)) {
+    if (exchange(sock, packet, length, client, DHCPOFFER, reply)) {
         printReply(reply);
         client.offeredIp = reply.offeredIp;
         client.serverIp = reply.serverIp;
 
         // 4. REQUEST -> ACK / NAK (same XID)
         length = buildPacket(packet, DHCPREQUEST, client);
-        if (exchange(sock, packet, length, iface.index, client, DHCPACK, reply)) {
+        if (exchange(sock, packet, length, client, DHCPACK, reply)) {
             printReply(reply);
             leased = reply.messageType == DHCPACK;
             if (!leased) std::fprintf(stderr, "Server sent NAK: request rejected.\n");
@@ -543,18 +430,15 @@ int main(int argc, char* argv[]) {
     }
 
     if (leased && apply) {
-        if (!applyLease(iface.systemName, reply)) {
-            std::fprintf(stderr, "Could not apply the lease to %s.\n", iface.systemName.c_str());
+        if (!applyLease(iface.name, reply)) {
+            std::fprintf(stderr, "Could not apply the lease to %s.\n", iface.name.c_str());
             leased = false;
         } else {
-            std::printf("Interface %s is now configured.\n", iface.systemName.c_str());
+            std::printf("Interface %s is now configured.\n", iface.name.c_str());
         }
     } else if (leased) {
         std::printf("Lease acknowledged. (Run with --apply to configure the interface.)\n");
     }
-    closeSocket(sock);
-#ifdef _WIN32
-    WSACleanup();
-#endif
+    close(sock);
     return leased ? 0 : 1;
 }

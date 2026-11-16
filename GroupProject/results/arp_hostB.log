@@ -1,0 +1,28 @@
+Connecting to LAN hub on port 9200...
+Host UP  IP=192.168.1.2  MAC=02:00:00:00:00:02
+
+=== Resolve peer 192.168.1.1 ===
+  Cache miss for 192.168.1.1
+  Sending ARP REQUEST (broadcast): who-has 192.168.1.1?
+  [event] ARP REPLY 192.168.1.1 is-at 02:00:00:00:00:01
+  [cache] 192.168.1.1 -> 02:00:00:00:00:01  (ttl 60s)
+  Resolved (after reply): 192.168.1.1 -> 02:00:00:00:00:01
+  --- ARP Cache ---
+  192.168.1.1  02:00:00:00:00:01  remaining=60s
+
+Commands: resolve <ip> | cache | grat | quit
+  Resolved (cache hit): 192.168.1.1 -> 02:00:00:00:00:01
+  Cache miss for 192.168.1.9
+  Sending ARP REQUEST (broadcast): who-has 192.168.1.9?
+  ARP timeout — no reply
+  --- ARP Cache ---
+  192.168.1.1  02:00:00:00:00:01  remaining=55s
+  [event] Gratuitous ARP: 192.168.1.1 is-at 02:00:00:00:00:01
+  [cache] 192.168.1.1 -> 02:00:00:00:00:01  (ttl 60s)
+  [event] Gratuitous ARP: 192.168.1.1 is-at 02:00:00:00:00:99
+  [cache] 192.168.1.1 -> 02:00:00:00:00:99  (ttl 60s)
+  --- ARP Cache ---
+  192.168.1.1  02:00:00:00:00:99  remaining=60s
+  [event] ARP REQUEST who-has ME from 192.168.1.4 (02:00:00:00:00:04)
+  [cache] 192.168.1.4 -> 02:00:00:00:00:04  (ttl 60s)
+  [event] ARP REPLY sent: 192.168.1.2 is-at 02:00:00:00:00:02

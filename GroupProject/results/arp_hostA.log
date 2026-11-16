@@ -1,0 +1,14 @@
+Connecting to LAN hub on port 9200...
+Host UP  IP=192.168.1.1  MAC=02:00:00:00:00:01
+
+Commands: resolve <ip> | cache | grat | quit
+  [event] ARP REQUEST who-has ME from 192.168.1.2 (02:00:00:00:00:02)
+  [cache] 192.168.1.2 -> 02:00:00:00:00:02  (ttl 60s)
+  [event] ARP REPLY sent: 192.168.1.1 is-at 02:00:00:00:00:01
+  [cache] 192.168.1.2 -> 02:00:00:00:00:02  (ttl 60s)
+  Gratuitous ARP announced for 192.168.1.1
+  [WARNING] IP conflict: 02:00:00:00:00:99 also claims 192.168.1.1
+  [event] ARP REQUEST who-has ME from 192.168.1.4 (02:00:00:00:00:04)
+  [cache] 192.168.1.4 -> 02:00:00:00:00:04  (ttl 60s)
+  [event] ARP REPLY sent: 192.168.1.1 is-at 02:00:00:00:00:01
+  [cache] 192.168.1.4 -> 02:00:00:00:00:04  (ttl 60s)

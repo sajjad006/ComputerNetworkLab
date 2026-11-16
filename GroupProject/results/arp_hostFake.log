@@ -1,0 +1,5 @@
+Connecting to LAN hub on port 9200...
+Host UP  IP=192.168.1.1  MAC=02:00:00:00:00:99
+
+Commands: resolve <ip> | cache | grat | quit
+  Gratuitous ARP announced for 192.168.1.1

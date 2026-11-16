@@ -1,0 +1,14 @@
+id,test,expected,observed,result
+F1,pc1 obtains a lease,192.168.50.100,192.168.50.100,PASS
+F2,pc2 (different MAC) gets the next address,192.168.50.101,192.168.50.101,PASS
+F3,"pc1 asks again: same MAC, same address",192.168.50.100,192.168.50.100,PASS
+F4,BusyBox udhcpc (independent client) on pc3,192.168.50.102,192.168.50.102,PASS
+F5,REQUEST for an address not reserved for this MAC,NAK,NAK,PASS
+F6,REQUEST naming another server (offer withdrawn),none,none,PASS
+F7,INIT-REBOOT REQUEST from an unknown client (RFC: stay silent),none,none,PASS
+F8,malformed packet (option runs past the end) is ignored,none,none,PASS
+F9,pool full (3 of 3 bound): DISCOVER from a 4th MAC,none,none,PASS
+F10,"after pc2 sends RELEASE, the 4th MAC gets an OFFER",OFFER,OFFER,PASS
+F11,"after pc3 DECLINEs .102, .102 is blocked (pool now full)",no lease,no lease,PASS
+F12,server logged the DECLINE and the pool-exhausted case,yes,yes,PASS
+F13,client with a non-existent interface exits with an error,1,1,PASS
